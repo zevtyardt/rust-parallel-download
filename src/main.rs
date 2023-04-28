@@ -3,6 +3,7 @@ use std::{
     path::Path,
 };
 
+use clap::Parser;
 use futures::stream;
 use futures_util::StreamExt;
 use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
@@ -11,6 +12,17 @@ use tokio::{
     fs::{self, File},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
+
+#[derive(Parser, Debug)]
+//#[argument(arg_required_else_help(false))]
+struct Cli {
+    ///Url of file to be downloaded
+    url: Option<String>,
+
+    ///Number of HTTP GET connections (2-16)
+    #[arg(short, long, value_name = "int")]
+    max_connections: Option<i32>,
+}
 
 #[derive(Debug, Clone)]
 struct Part {
@@ -28,7 +40,7 @@ impl Part {
         }
     }
 
-    fn to_string(&self) -> String {
+    fn to_header_string(&self) -> String {
         format!("bytes={}-{}", self.offset, self.offset + self.size - 1)
     }
 
@@ -83,9 +95,8 @@ impl Downloader {
         let path = Path::new(&url);
         if let Some(filename) = path.file_name() {
             return filename.to_str().unwrap().to_string();
-        } else {
-            return self.get_filename(self.url.clone());
         }
+        self.get_filename(self.url.clone())
     }
 
     fn get_parts(&self, length: usize) -> Vec<Part> {
@@ -110,7 +121,7 @@ impl Downloader {
             let request = self
                 .client
                 .get(&self.url)
-                .header("Range", part.to_string())
+                .header("Range", part.to_header_string())
                 .send()
                 .await;
 
@@ -118,7 +129,7 @@ impl Downloader {
                 let mut stream = response.bytes_stream();
                 while let Some(chunk) = stream.next().await {
                     if let Ok(bytes) = chunk {
-                        file.write(&bytes).await.unwrap();
+                        file.write_all(&bytes).await.unwrap();
                         let len = bytes.len() as u64;
                         bar.inc(len);
                         total_bytes += len;
@@ -149,11 +160,9 @@ impl Downloader {
     async fn is_already_downloaded(&self, length: &usize) -> bool {
         let filename = &self.filename;
         let filepath = Path::new(filename);
-        if filepath.exists() {
-            if fs::metadata(filepath).await.unwrap().len() == *length as u64 {
-                println!("[+] Aborting, file already downloaded!");
-                return true;
-            }
+        if filepath.exists() && fs::metadata(filepath).await.unwrap().len() == *length as u64 {
+            println!("[+] Aborting, file already downloaded!");
+            return true;
         }
         false
     }
@@ -272,18 +281,27 @@ fn user_input(msg: &str) -> String {
 
 #[tokio::main()]
 async fn main() {
-    let url = user_input("[?] url: ");
-    if let Ok(mut max_conns) = user_input("[?] max connections (2-16): ").parse::<i32>() {
+    let mut cli = Cli::parse();
+    if cli.url.is_none() {
+        cli.url = Some(user_input("[?] url: "));
+    }
+    if cli.max_connections.is_none() {
+        if let Ok(m) = user_input("[?] max connections (2-16): ").parse::<i32>() {
+            cli.max_connections = Some(m);
+        } else {
+            println!("[+] Enter a valid number!")
+        }
+    }
+
+    if let Some(max_conns) = cli.max_connections {
         if max_conns < 2 {
-            max_conns = 2;
+            cli.max_connections = Some(2);
         }
         if max_conns > 16 {
-            max_conns = 16;
+            cli.max_connections = Some(16);
         }
-
-        let mut downloader = Downloader::new(url, max_conns);
-        downloader.start().await;
-    } else {
-        println!("[+] Enter a valid number")
     }
+
+    let mut downloader = Downloader::new(cli.url.unwrap(), cli.max_connections.unwrap());
+    downloader.start().await;
 }
