@@ -207,10 +207,6 @@ impl Downloader {
             bar.set_style(template.clone());
             bar.set_message(format!("Part-{}", index + 1));
 
-            if index == 0 {
-                bar.println("[+] Start downloading")
-            }
-
             let file_part = format!("parts/{}.part-{}", &self.filename, index + 1);
             let mut file: File;
             if Path::new(&file_part).exists() {
@@ -234,6 +230,10 @@ impl Downloader {
                 }
             } else {
                 file = File::create(file_part).await.unwrap()
+            }
+
+            if index as i32 == self.max_conns - 1 {
+                bar.println("[+] Start downloading")
             }
 
             let fut = self.download(part, bar, file);
