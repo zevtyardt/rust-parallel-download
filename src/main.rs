@@ -104,7 +104,7 @@ impl Downloader {
         parts
     }
 
-    async fn download(&self, part: &Part, bar: ProgressBar, mut file: File, is_single_part: bool) {
+    async fn download(&self, part: &Part, bar: ProgressBar, mut file: File) {
         let mut total_bytes = 0;
         if part.size > 0 {
             let request = self
@@ -122,10 +122,6 @@ impl Downloader {
                         let len = bytes.len() as u64;
                         bar.inc(len);
                         total_bytes += len;
-
-                        if is_single_part {
-                            bar.set_length(total_bytes)
-                        }
                     }
                 }
             }
@@ -206,8 +202,6 @@ impl Downloader {
         .unwrap();
 
         let mut futures = vec![];
-        let is_single_part = parts.len() == 1;
-
         for (index, part) in parts.iter_mut().enumerate() {
             let bar = multi_progress.add(ProgressBar::new(part.size as u64));
             bar.set_style(template.clone());
@@ -242,7 +236,7 @@ impl Downloader {
                 file = File::create(file_part).await.unwrap()
             }
 
-            let fut = self.download(part, bar, file, is_single_part);
+            let fut = self.download(part, bar, file);
             futures.push(fut);
         }
 
@@ -279,9 +273,12 @@ fn user_input(msg: &str) -> String {
 #[tokio::main()]
 async fn main() {
     let url = user_input("[?] url: ");
-    if let Ok(mut max_conns) = user_input("[?] max connections (limit 8): ").parse::<i32>() {
-        if max_conns > 8 {
-            max_conns = 8;
+    if let Ok(mut max_conns) = user_input("[?] max connections (2-16): ").parse::<i32>() {
+        if max_conns < 2 {
+            max_conns = 2;
+        }
+        if max_conns > 16 {
+            max_conns = 16;
         }
 
         let mut downloader = Downloader::new(url, max_conns);
