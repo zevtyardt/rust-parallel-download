@@ -27,6 +27,7 @@ $ cargo run --release
 # Features
 - [x] auto-detect file name and size
 - [x] download files separately
+- [x] progress bar
 
 # Any questions
 Feel free to open a new issue 🥳
