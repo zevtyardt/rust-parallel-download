@@ -145,9 +145,9 @@ impl Downloader {
         if *length == 0 {
             println!("[+] Remote file name has no length!");
             println!("[+] Failed writing received data to disk/application");
-            return true;
+            return false;
         }
-        false
+        true
     }
 
     async fn is_already_downloaded(&self, length: &usize) -> bool {
@@ -193,7 +193,7 @@ impl Downloader {
         }
 
         let length = self.get_content_length().await;
-        if self.is_downloadable(&length) || self.is_already_downloaded(&length).await {
+        if !self.is_downloadable(&length) || self.is_already_downloaded(&length).await {
             return;
         }
         self.check_metadata().await;
