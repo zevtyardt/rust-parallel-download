@@ -191,10 +191,8 @@ impl Downloader {
 
     async fn start(&mut self) {
         let dir_parts = Path::new("parts/");
-        if !dir_parts.is_dir() {
-            if let Ok(_) = fs::create_dir(dir_parts).await {
-                println!("[+] Parts folder created");
-            }
+        if !dir_parts.is_dir() && fs::create_dir(dir_parts).await.is_ok() {
+            println!("[+] Parts folder created");
         }
 
         let length = self.get_content_length().await;
