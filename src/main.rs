@@ -287,7 +287,8 @@ async fn main() {
         if let Ok(m) = user_input("[?] max connections (2-16): ").parse::<i32>() {
             cli.max_connections = Some(m);
         } else {
-            println!("[+] Enter a valid number!")
+            println!("[+] Enter a valid number!");
+            return;
         }
     }
 
